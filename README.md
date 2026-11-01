@@ -1,4 +1,4 @@
-[![npm](https://img.shields.io/npm/v/flaget?logo=npm&color=brightgreen "npm package")](https://www.npmjs.com/package/ansis "download npm package")
+[![npm](https://img.shields.io/npm/v/flaget?logo=npm&color=brightgreen "npm package")](https://www.npmjs.com/package/flaget "download npm package")
 [![node](https://img.shields.io/node/v/flaget)](https://nodejs.org)
 [![Test](https://github.com/webdiscus/flaget/actions/workflows/test.yml/badge.svg)](https://github.com/webdiscus/flaget/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/webdiscus/flaget/graph/badge.svg?token=ETZKAUG7D3)](https://codecov.io/gh/webdiscus/flaget)
