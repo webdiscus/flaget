@@ -7,6 +7,7 @@
  * @param options.alias Map of short keys to long keys, e.g. { f: 'files' }.
  * @param options.array Keys that should collect multiple values into arrays.
  * @param options.boolean Keys that should always be parsed as boolean flags.
+ * @param options.string Keys whose values are kept as written, never cast to numbers or booleans.
  * @param options.default Default values for missing flags.
  * @returns Parsed CLI parameters including flags, positional arguments, and rest arguments.
  */
@@ -16,6 +17,7 @@ declare function flaget(options?: {
   alias?: Record<string, string>;
   array?: string[];
   boolean?: string[];
+  string?: string[];
   default?: Record<string, unknown>;
 }): {
   args: Record<string, string | string[] | undefined>;

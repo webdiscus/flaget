@@ -225,6 +225,18 @@ describe('flaget - flags', () => {
     });
   });
 
+  test('last value wins', () => {
+    const cli = '--tag=beta --tag=release';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({ args: {}, flags: { tag: 'release' }, _: [], _tail: [] });
+  });
+
+  test('last value wins, negated flag', () => {
+    const cli = '--tag x --no-tag';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({ args: {}, flags: { tag: false }, _: [], _tail: [] });
+  });
+
   test('apply default values', () => {
     const cliParams = flaget({ raw: [], default: { mode: 'production', output: 'dist' } });
     expect(cliParams).toEqual({
@@ -232,6 +244,91 @@ describe('flaget - flags', () => {
       flags: { mode: 'production', output: 'dist' },
       _: [],
       _tail: []
+    });
+  });
+});
+
+describe('flaget - negative numbers', () => {
+  test('negative number as next argument is a value', () => {
+    const cli = '--offset -5';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({ args: {}, flags: { offset: -5 }, _: [], _tail: [] });
+  });
+
+  test('negative decimal number as next argument is a value', () => {
+    const cli = '--offset -0.5';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({ args: {}, flags: { offset: -0.5 }, _: [], _tail: [] });
+  });
+
+  test('negative number after short alias', () => {
+    const cli = '-o -5';
+    const cliParams = flaget({ raw: cli.split(' '), alias: { o: 'offset' } });
+    expect(cliParams).toEqual({ args: {}, flags: { offset: -5 }, _: [], _tail: [] });
+  });
+
+  test('negative number in array', () => {
+    const cli = '--range -5 10';
+    const cliParams = flaget({ raw: cli.split(' '), array: ['range'] });
+    expect(cliParams).toEqual({ args: {}, flags: { range: [-5, 10] }, _: [], _tail: [] });
+  });
+
+  test('dash with a letter is a flag', () => {
+    const cli = '--offset -x';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({
+      args: {},
+      flags: { offset: true, x: true },
+      _: [],
+      _tail: [],
+    });
+  });
+});
+
+describe('flaget - short flag with equals', () => {
+  test('number value', () => {
+    const cli = '-n=007';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({ args: {}, flags: { n: 7 }, _: [], _tail: [] });
+  });
+
+  test('text value', () => {
+    const cli = '-n=abc';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({ args: {}, flags: { n: 'abc' }, _: [], _tail: [] });
+  });
+
+  test('empty value gives empty string', () => {
+    const cli = '-n=';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({ args: {}, flags: { n: '' }, _: [], _tail: [] });
+  });
+
+  test('alias with negative number', () => {
+    const cli = '-o=-5';
+    const cliParams = flaget({ raw: cli.split(' '), alias: { o: 'offset' } });
+    expect(cliParams).toEqual({ args: {}, flags: { offset: -5 }, _: [], _tail: [] });
+  });
+
+  test('last flag in group takes value after equals', () => {
+    const cli = '-abn=5';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({
+      args: {},
+      flags: { a: true, b: true, n: 5 },
+      _: [],
+      _tail: [],
+    });
+  });
+
+  test('attached value without equals stays a group', () => {
+    const cli = '-n007';
+    const cliParams = flaget({ raw: cli.split(' ') });
+    expect(cliParams).toEqual({
+      args: {},
+      flags: { n: true, 0: true, 7: true },
+      _: [],
+      _tail: [],
     });
   });
 });

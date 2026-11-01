@@ -1,6 +1,14 @@
 # Changelog
 
-## 2.1.1 (20225-07-12)
+## 2.2.0 (2026-11-02)
+
+- feat: add `string` option to keep values of chosen flags as written, e.g. `--zip=01234` -> `{ zip: '01234' }`
+- feat: a short flag in `string` option takes a value in POSIX style: `-n007`, `-abn 007`, `-abn=007`
+- feat: throw `TypeError` if a flag is in both `boolean` and `string` options
+- fix: a negative number after a flag is a value, e.g. `--offset -5` -> `{ offset: -5 }`
+- fix: a short flag with value after equals, e.g. `-n=5` -> `{ n: 5 }`
+
+## 2.1.1 (2025-07-12)
 
 - chore: improve performance
 - chore: reduce unpacked package size
@@ -13,7 +21,7 @@
 - feat: add support TSC, compatible with `module: "Node16"`
 - feat: reduce unpacked package size
 
-## 2.0.0 (20225-07-08)
+## 2.0.0 (2025-07-08)
 
 - feat(BREAKING CHANGE): optimized structure of return object with parsed elements\
   Example: `cli --verbose file.txt -- one two`\

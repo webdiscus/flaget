@@ -10,22 +10,35 @@
  */
 
 /**
- * Check if the next argument exists and is not a flag.
+ * Check if a string is a number, e.g. 5, -5, 0.5, -0.5.
+ * @param {string} val The value to check.
+ * @returns {boolean}
+ */
+const isNumber = (val) => /^-?\d+(\.\d+)?$/.test(val);
+
+/**
+ * Check if the next argument exists and is a value.
+ * A negative number is a value, other arguments starting with "-" are flags.
  * @param {Array<string>} raw The raw argv array.
  * @param {number} i Current index.
- * @returns {boolean} True if the next argument is a value (not a flag).
+ * @returns {boolean} True if the next argument is a value.
  */
-const isArg = (raw, i) => raw[++i] != null && raw[i][0] !== '-';
+const isArg = (raw, i) => {
+  let val = raw[i + 1];
+  return val != null && (val[0] !== '-' || isNumber(val));
+};
 
 /**
  * Convert a string to boolean or number if possible.
  * @param {string} val The value to convert.
+ * @param {boolean} [isString] If true, the value is given as is.
  * @returns {string|boolean|number} The casted value.
  */
-const cast = (val) => {
+const cast = (val, isString) => {
+  if (isString) return val;
   if (val === 'true') return true;
   if (val === 'false') return false;
-  if (/^-?\d+(\.\d+)?$/.test(val)) return Number(val);
+  if (isNumber(val)) return Number(val);
   return val;
 };
 
@@ -50,19 +63,20 @@ const setFlag = (res, key, val) => {
  * @param {Array} raw The argv array.
  * @param {number} i The index to start collecting from.
  * @param {string|undefined} val The initial raw value if inline.
+ * @param {boolean} isString If true, the values are given as is.
  * @returns {{values: Array, offset: number}} The collected values and offset.
  */
-const getArray = (raw, i, val) => {
+const getArray = (raw, i, val, isString) => {
   let values = [];
   let j = i;
 
   if (val != null) {
-    values.push(cast(val));
+    values.push(cast(val, isString));
     return { values, offset: 0 };
   }
 
   while (isArg(raw, j)) {
-    values.push(cast(raw[++j]));
+    values.push(cast(raw[++j], isString));
   }
 
   // offset is difference between current index "j" and start index "i"
@@ -80,6 +94,7 @@ const getArray = (raw, i, val) => {
  * @param {object} [options.alias={}] Mapping of flag aliases to full flag names.
  * @param {Array} [options.array=[]] Flag keys that should be collected into arrays.
  * @param {Array} [options.boolean=[]] Flag keys that should always be parsed as booleans.
+ * @param {Array} [options.string=[]] Flag keys whose values are never cast.
  * @param {object} [options.default={}] Default values for missing flags.
  * @returns {{
  *   _: string[],          // Positional arguments before "--"
@@ -89,8 +104,41 @@ const getArray = (raw, i, val) => {
  * }} Parsed result object.
  */
 const flaget = (options = {}) => {
-  let { raw = process.argv.slice(2), alias = {}, array = [], boolean = [] } = options;
+  let { raw = process.argv.slice(2), alias = {}, array = [], boolean = [], string = [] } = options;
   let res = { args: {}, flags: {}, _: [], _tail: [] };
+
+  for (let key of string) {
+    if (boolean.includes(key)) throw new TypeError(`Flag "${key}" can not be in both "boolean" and "string" options`);
+  }
+
+  /**
+   * Set a flag that can take a value.
+   * @param {string} key The long flag key.
+   * @param {string|null} val The inline value, or null to take the next argument.
+   * @param {number} i The current argv index.
+   * @returns {number} The updated index.
+   */
+  const setValue = (key, val, i) => {
+    let isString = string.includes(key);
+
+    if (boolean.includes(key)) {
+      setFlag(res, key, true);
+      return i;
+    }
+
+    // flag with multi-value
+    if (array.includes(key)) {
+      let { values, offset } = getArray(raw, i, val, isString);
+      setFlag(res, key, (res.flags[key] || []).concat(values));
+      return i + offset;
+    }
+
+    // a string flag without value gives an empty string
+    val = val != null ? cast(val, isString) : isArg(raw, i) ? cast(raw[++i], isString) : isString ? '' : true;
+    setFlag(res, key, val);
+
+    return i;
+  };
 
   /**
    * Parse a long flag argument (e.g., --key, --no-key or --key=value).
@@ -110,62 +158,36 @@ const flaget = (options = {}) => {
 
       key = alias[key] || key;
 
-      // negated or boolean flag
-      if (isNo || boolean.includes(key)) {
-        setFlag(res, key, !isNo);
+      if (isNo) {
+        setFlag(res, key, false);
         return i;
       }
 
-      // flag with muli-value
-      if (array.includes(key)) {
-        let { values, offset } = getArray(raw, i, val);
-        setFlag(res, key, (res.flags[key] || []).concat(values));
-        return i + offset;
-      }
-
-      val = val != null ? cast(val) : isArg(raw, i) ? cast(raw[++i]) : true;
-
-      setFlag(res, key, val);
-
-      return i;
+      return setValue(key, val, i);
     };
 
   /**
-   * Parse short CLI flags (-a, -abc, -f value).
+   * Parse short CLI flags (POSIX): -a, -abc, -f value, -f=value.
+   * A string flag takes the rest of the argument as its value: -nvalue, -abnvalue.
    *
    * @param {string} arg The current argument.
    * @param {number} i The current argv index.
    * @returns {number} Updated index.
    */
   const parseShort = (arg, i) => {
-    // grouped flags like -abc -> -a -b -c
-    if (arg.length > 2) {
-      for (let char of arg.slice(1)) {
-        let key = alias[char] || char;
-        setFlag(res, key,true);
+    for (let j = 1; j < arg.length; j++) {
+      let key = alias[arg[j]] || arg[j];
+      let isEq = arg[j + 1] === '=';
+
+      // a single flag, a flag before "=" or a string flag takes a value
+      if (isEq || arg.length < 3 || string.includes(key)) {
+        let val = arg.slice(j + 1 + isEq);
+        return setValue(key, isEq || val ? val : null, i);
       }
-      return i;
-    }
 
-    // single flag like -f [value]
-    let key = alias[arg[1]] || arg[1];
-
-    if (boolean.includes(key)) {
+      // grouped flags like -abc -> -a -b -c
       setFlag(res, key, true);
-      return i;
     }
-
-    if (array.includes(key)) {
-      let values = [], j = i;
-      while (isArg(raw, j)) {
-        values.push(cast(raw[++j]));
-      }
-      setFlag(res, key, (res.flags[key] || []).concat(values));
-      return j;
-    }
-
-    let val = isArg(raw, i) ? cast(raw[++i]) : true;
-    setFlag(res, key, val);
 
     return i;
   };

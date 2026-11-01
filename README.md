@@ -16,10 +16,13 @@ Supports all standard CLI flag formats and named positional arguments.
 - Supports ESM, CommonJS, TypeScript
 - Short `-f` and long `--flag` flags
 - Grouped short boolean flags `-xyz`
-- Values via `--key=value` or `--key value`
+- Values via `--key=value`, `--key value`, `-k=value` or `-k value`
+- Negative numbers as values `--offset -5`
 - Multi-value flags via `array` option
 - Negated flags `--no-color`
 - Boolean-only flags via `boolean` option
+- Text values via `string` option, kept as written `--zip=01234`
+- POSIX short flags with value `-xvf archive.tar`, `-n5` for flags in `string` option
 - Named and variadic (`...rest`) positional arguments via `args` option
 - Short-to-long mapping via `alias` option
 - Auto-casts numbers and booleans from values
@@ -92,15 +95,24 @@ Result:
 Flags can behave as booleans, accept a single value, or collect multiple values.
 Their behavior depends on syntax, position, and parser options like `boolean` and `array`.
 
-| Input              | Output                          | Condition                                                   |
-|--------------------|---------------------------------|-------------------------------------------------------------|
-| `--flag` or `-f`   | `{ flag: true }`                | Next token is absent or starts with `-`                     |
-| `--flag=value`     | `{ flag: 'value' }`             | Always treated as key=value                                 |
-| `--flag value`     | `{ flag: 'value' }`             | Next token is a value and `flag` is not in `boolean` option |
-| `--flag arg`       | `{ flag: true }, _: ['arg']`    | `flag` is in `boolean` option                               |
-| `-xyz`             | `{ x: true, y: true, z: true }` | Grouped short flags, always `true`                          |
-| `--no-flag`        | `{ flag: false }`               | Negated flag, always `false`                                |
-| `--flag val1 val2` | `{ flag: ['val1', 'val2'] }`    | `flag` is in `array` option                                 |
+| Input                      | Output                             | Condition                                                   |
+|----------------------------|------------------------------------|-------------------------------------------------------------|
+| `--flag` or `-f`           | `{ flag: true }`                   | Next token is absent or is a flag                           |
+| `--flag` or `-f`           | `{ flag: '' }`                     | Next token is absent or is a flag, `flag` is in `string` option |
+| `--flag=value` or `-f=value` | `{ flag: 'value' }`              | Always treated as key=value                                 |
+| `--flag value` or `-f value` | `{ flag: 'value' }`              | Next token is a value and `flag` is not in `boolean` option |
+| `--flag -5`                | `{ flag: -5 }`                     | A negative number is a value                                |
+| `--flag=007`               | `{ flag: '007' }`                  | `flag` is in `string` option, the value is kept as written  |
+| `--flag arg`               | `{ flag: true }, _: ['arg']`       | `flag` is in `boolean` option                               |
+| `-xyz`                     | `{ x: true, y: true, z: true }`    | Grouped short flags                                         |
+| `-xyf=value`               | `{ x: true, y: true, f: 'value' }` | The last flag in a group takes the value after `=`          |
+| `-xyf value`               | `{ x: true, y: true, f: 'value' }` | `f` is in `string` option                                   |
+| `-fvalue`                  | `{ f: 'value' }`                   | `f` is in `string` option, the rest of the token is the value |
+| `--no-flag`                | `{ flag: false }`                  | Negated flag, always `false`                                |
+| `--flag val1 val2`         | `{ flag: ['val1', 'val2'] }`       | `flag` is in `array` option                                 |
+
+A token that starts with `-` is a flag, except a negative number like `-5` or `-0.5`, which is a value.\
+If a flag is given more than once, the last value wins, e.g. `--tag=beta --tag=release` gives `{ tag: 'release' }`.
 
 
 ## Options
@@ -114,6 +126,7 @@ The function accepts an optional configuration object to customize the parsing b
 | `alias`    | Object     | `{}`                    | Mapping of short flag keys to long keys. For example, `{ f: 'files' }` will map `-f` to `--files`.                                                                                                                     |
 | `array`    | string[]   | `[]`                    | List of flag keys that should collect multiple values into arrays. Values are collected until the next flag, terminator `--` or the end of input.                                                                      |
 | `boolean`  | string[]   | `[]`                    | List of flag keys that should always be parsed as booleans. These flags never consume a value, even if the next argument looks like one.                                                                               |
+| `string`   | string[]   | `[]`                    | List of flag keys whose values are kept as written. These values are never cast to numbers or booleans. A flag without a value gives `''`. A flag can not be in both `boolean` and `string` options, this throws a `TypeError`. |
 | `default`  | Object     | `{}`                    | Map of default values for flags that are not provided on the CLI.                                                                                                                                                      |
 
 
@@ -241,6 +254,60 @@ Output:
 }
 
 ```
+
+### Option `string`
+
+Keep values as written.
+
+```bash
+$ cli.js --zip 01234 --version=1.10 --port 8080
+```
+
+```js
+const cliParams = flaget({
+  string: ['zip', 'version']
+});
+
+console.log(cliParams);
+```
+
+Output:
+
+```json5
+{
+  args: {},
+  flags: { zip: '01234', version: '1.10', port: 8080 },
+  _: [],
+  _tail: []
+}
+```
+
+A short flag in `string` option takes a value in POSIX style.
+
+```bash
+$ tar.js -xvf archive.tar
+```
+
+```js
+const cliParams = flaget({
+  string: ['f']
+});
+
+console.log(cliParams);
+```
+
+Output:
+
+```json5
+{
+  args: {},
+  flags: { x: true, v: true, f: 'archive.tar' },
+  _: [],
+  _tail: []
+}
+```
+
+The same result gives `-xvf=archive.tar` and `-xvfarchive.tar`.
 
 ### Option `default`
 
