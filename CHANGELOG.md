@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 (2026-11-02)
+
+- fix: a value after `=` of a flag in `boolean` option is no longer lost: `--flag=false` gives `{ flag: false }`,
+  `--flag=true` gives `{ flag: true }`, another value stays as written, e.g. `--flag=no` gives `{ flag: 'no' }`
+
 ## 2.2.0 (2026-11-02)
 
 - feat: add `string` option to keep values of chosen flags as written, e.g. `--zip=01234` -> `{ zip: '01234' }`

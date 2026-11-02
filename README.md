@@ -104,6 +104,8 @@ Their behavior depends on syntax, position, and parser options like `boolean` an
 | `--flag -5`                | `{ flag: -5 }`                     | A negative number is a value                                |
 | `--flag=007`               | `{ flag: '007' }`                  | `flag` is in `string` option, the value is kept as written  |
 | `--flag arg`               | `{ flag: true }, _: ['arg']`       | `flag` is in `boolean` option                               |
+| `--flag=false`             | `{ flag: false }`                  | `flag` is in `boolean` option, `true` and `false` give a boolean |
+| `--flag=no`                | `{ flag: 'no' }`                   | `flag` is in `boolean` option, another value stays as written |
 | `-xyz`                     | `{ x: true, y: true, z: true }`    | Grouped short flags                                         |
 | `-xyf=value`               | `{ x: true, y: true, f: 'value' }` | The last flag in a group takes the value after `=`          |
 | `-xyf value`               | `{ x: true, y: true, f: 'value' }` | `f` is in `string` option                                   |
@@ -230,6 +232,8 @@ Output:
 ### Option `boolean`
 
 Prevent consuming next value.
+A value after `=` gives `true` or `false` for `--flag=true` and `--flag=false`, another value stays as written,
+e.g. `--flag=no` gives `{ flag: 'no' }`: the caller decides.
 
 ```bash
 $ cli.js --debug input.txt

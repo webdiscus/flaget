@@ -121,8 +121,10 @@ const flaget = (options = {}) => {
   const setValue = (key, val, i) => {
     let isString = string.includes(key);
 
+    // A boolean flag never takes the next argument. A value after `=` gives a boolean only for `true` and `false`,
+    // another value stays as written: the caller decides.
     if (boolean.includes(key)) {
-      setFlag(res, key, true);
+      setFlag(res, key, val == null || val === 'true' ? true : val === 'false' ? false : val);
       return i;
     }
 
